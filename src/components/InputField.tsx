@@ -1,30 +1,35 @@
-import { Dispatch, SetStateAction, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import { TranslationResponse } from '../@types/TranslationResponse';
 
 type InputFieldProps = {
   setTranslatedValue: Dispatch<SetStateAction<string>>;
   originLanguage: string;
   finalLanguage: string;
-  loading: boolean;
   setLoading: Dispatch<SetStateAction<boolean>>;
+  value: string;
+  setValue: Dispatch<SetStateAction<string>>;
 };
 
 export default function InputField({
   setTranslatedValue,
   originLanguage,
   finalLanguage,
-  loading,
   setLoading,
+  value,
+  setValue,
 }: InputFieldProps) {
-  const [value, setValue] = useState('');
   const [error, setError] = useState('');
 
-  async function translate() {
+  const translate = useDebouncedCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      if (!value) throw new Error('O texto não pode estar vazio!');
+      if (!value) {
+        setTranslatedValue('');
+        return;
+      }
       const res = await fetch(
         `https://api.mymemory.translated.net/get?q=${value}&langpair=${originLanguage}|${finalLanguage}`
       );
@@ -36,15 +41,21 @@ export default function InputField({
     } finally {
       setLoading(false);
     }
-  }
+  }, 500);
 
+  useEffect(() => {
+    translate();
+  }, [translate, finalLanguage, originLanguage]);
   return (
     <div>
-      <div className="h-64 border border-zinc-400 bg-zinc-200/80 rounded overflow-hidden flex relative">
+      <div className="h-64 border border-zinc-400 bg-zinc-200/80 rounded-lg flex relative">
         <textarea
           onClick={() => setError('')}
           value={value}
-          onChange={e => setValue(e.target.value.slice(0, 250))}
+          onChange={e => {
+            translate();
+            setValue(e.target.value.slice(0, 250));
+          }}
           onKeyDown={async e => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -52,15 +63,8 @@ export default function InputField({
             }
           }}
           placeholder="Digitar Texto"
-          className="w-full h-full resize-none px-3 py-2 text-zinc-700"
+          className="w-full h-full resize-none px-3 py-2 text-zinc-700 md:text-xl rounded-lg"
         ></textarea>
-        <button
-          onClick={translate}
-          disabled={loading}
-          className="text-sm bg-blue-950 rounded-full px-7 py-1 text-zinc-200 absolute right-2 bottom-2 hover:bg-blue-900 transition disabled:bg-zinc-600/80"
-        >
-          {loading ? 'Traduzir' : 'Traduzir'}
-        </button>
         <span className="text-zinc-600 text-sm absolute left-2 bottom-2 flex gap-0.5">
           <span>{value.length}</span>
           <span>/</span>
